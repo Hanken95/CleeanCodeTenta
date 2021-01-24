@@ -8,6 +8,8 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Web.Http.ModelBinding;
 using Microsoft.AspNetCore.Mvc;
+using MovieLibrary.Adapters;
+using MovieLibrary.Interfaces;
 using MovieLibrary.Models;
 
 namespace MovieLibrary.Controllers
@@ -23,25 +25,35 @@ namespace MovieLibrary.Controllers
         [Route("/getmovielist")]
         public async Task<List<Movie>> GetMovieList(bool sortAscencing = true)
         {
-            List<Movie> returnList = new List<Movie>();
-            HttpResponseMessage response = await client.GetAsync("https://ithstenta2020.s3.eu-north-1.amazonaws.com/topp100.json");
-            var responseContent = await response.Content.ReadAsStringAsync();
-            var movieList = JsonSerializer.Deserialize<List<Movie>>(responseContent);
-            foreach (var movie in movieList) 
+            ITarget target = new MovieAdapter(new Adaptees.Adaptee());
+            List<Movie> movieList = await GetMovies();
+            List<Movie> castedMovieList = await target.GetMovies();
+            castedMovieList.ForEach(movie =>
             {
-                returnList.Add(movie);
-            }
+                if (!movieList.Any(castedMovie => castedMovie.title == movie.title))
+                {
+                    movieList.Add(movie);
+                }
+            });
             if (sortAscencing)
             {
-                returnList = returnList.OrderBy(movie => movie.rated).ToList();
+                movieList = movieList.OrderBy(movie => movie.rated).ToList();
             }
             else
             {
-                returnList = returnList.OrderByDescending(movie => movie.rated).ToList();
+                movieList = movieList.OrderByDescending(movie => movie.rated).ToList();
             }
-            return returnList;
+            return movieList;
         }
-        
+
+        private static async Task<List<Movie>> GetMovies()
+        {
+            HttpResponseMessage response = await client.GetAsync("https://ithstenta2020.s3.eu-north-1.amazonaws.com/topp100.json");
+            var responseContent = await response.Content.ReadAsStringAsync();
+            var movieList = JsonSerializer.Deserialize<List<Movie>>(responseContent);
+            return movieList;
+        }
+
         [HttpGet]
         [Route("/movie")]
         public async Task<ActionResult<Movie>> GetMovieById(string id) 
